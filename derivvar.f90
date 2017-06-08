@@ -1,0 +1,13 @@
+MODULE DERIVVAR
+  !
+  ! J M Borrero
+  ! Sep 16, 2017
+  ! KIS, Freiburg
+  !
+  USE CONS_PARAM
+  REAL(DP)                   :: DNHYDDTEMP_PG, DNHYDDTEMP_RHO
+  REAL(DP)                   :: DDAMDTEMP_PG, DDAMDTEMP_RHO
+  REAL(DP)                   :: DNELECDPG_TEMP, DNELECDTEMP_RHO, DNELECDTEMP_PG
+  REAL(DP)                   :: DKLINDT_PG, DKLINDT_RHO
+  !
+END MODULE DERIVVAR

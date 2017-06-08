@@ -1,0 +1,156 @@
+MODULE RTESOLVER
+  !
+  ! May 22, 2014
+  ! KIS, Freiburg
+  !
+  USE CONS_PARAM
+  USE SIMUL_BOX
+  USE ABSORPTION_MATRIX
+  !
+  IMPLICIT NONE
+  !
+CONTAINS
+  !
+  ! analytical_solver
+  ! evol_operator
+  !
+  !-----------------------------
+  ! Subroutine analytical_solver
+  !-----------------------------
+  SUBROUTINE ANALYTICAL_SOLVER(I,J,K,L)
+    !
+    IMPLICIT NONE
+    !
+    INTEGER,    INTENT(IN)     :: I,J,K,L
+    !
+    CALL EVOL_OPERATOR(I,J,K,L)
+    !
+  END SUBROUTINE ANALYTICAL_SOLVER
+  !-----------------------------
+  ! Subroutine evol_operator
+  !-----------------------------
+  SUBROUTINE EVOL_OPERATOR(I,J,K,L)
+    !
+    IMPLICIT NONE
+    !
+    INTEGER,   INTENT(IN)      :: I,J,K,L
+    REAL(DP)                   :: ETA_I, ETA_Q, ETA_U, ETA_V
+    REAL(DP)                   :: RHO_Q, RHO_U, RHO_V
+    REAL(DP)                   :: ETA2, RHO2, ETARHO, SIGMA, THETA, RPART, EXPETAI
+    COMPLEX                    :: LAMBDA1, LAMBDA2, CPART, COSHL1, SINHL1, COSL2, SINL2, II
+    COMPLEX, DIMENSION(4,4)    :: M1, M2, M3, M4, EVOL
+    INTEGER                    :: M
+    !
+    M1(:,:)=0.
+    M2(:,:)=0.
+    M3(:,:)=0.
+    M4(:,:)=0.
+    SIGMA=0.
+    !
+    II=DCMPLX(0D0,1D0)
+    !
+    ETA_I=DBLE(ETAI(I,J,K,L))
+    ETA_Q=DBLE(ETAQ(I,J,K,L))
+    ETA_U=DBLE(ETAU(I,J,K,L))
+    ETA_V=DBLE(ETAV(I,J,K,L))
+    RHO_Q=DBLE(RHOQ(I,J,K,L))
+    RHO_U=DBLE(RHOU(I,J,K,L))
+    RHO_V=DBLE(RHOV(I,J,K,L))
+    !PRINT*,ETA_I,ETA_Q,ETA_U,ETA_V,RHO_Q,RHO_U,RHO_V
+    !STOP
+    !
+    ! This part follows Landi Degl'Innocenti & Landi Degl'Innocenti
+    ! Solar Physics, 1985, 239-250
+    ETA2=ETA_Q**2.+ETA_U**2.+ETA_V**2.
+    RHO2=RHO_Q**2.+RHO_U**2.+RHO_V**2.
+    ETARHO=ETA_Q*RHO_Q+ETA_U*RHO_U+ETA_V*RHO_V
+    RPART=SQRT(((ETA2-RHO2)**2.)/4.+ETARHO**2.)+(ETA2-RHO2)/2.
+    IF (RPART.LT.0) THEN
+       PRINT*,'Hola 1'
+       PRINT*,ETA2,RHO2,ETARHO
+       STOP
+    ENDIF
+    CPART=DCMPLX(RPART,0.)
+    LAMBDA1=SQRT(CPART)
+    !
+    RPART=SQRT(((ETA2-RHO2)**2.)/4.+ETARHO**2.)-(ETA2-RHO2)/2.
+    IF (RPART.LT.0) THEN
+       PRINT*,'Hola 1'
+       PRINT*,ETA2,RHO2,ETARHO
+       STOP
+    ENDIF
+       
+    CPART=DCMPLX(RPART,0.)
+    LAMBDA2=SQRT(CPART)
+    IF (ETARHO.GT.0) SIGMA=1.
+    IF (ETARHO.LT.0) SIGMA=-1.
+    THETA=2.*SQRT(((ETA2-RHO2)**2.)/4.+ETARHO**2.)
+    !
+    !print*,eta2,rho2,etarho,lambda1,lambda2,theta
+    !pause
+    ! M1 matrix is the indentiy matrix
+    DO M=1,4
+       M1(M,M)=DCMPLX(1.,0.)
+    ENDDO
+    ! M2 matrix
+    M2(1,2)=LAMBDA2*ETA_Q-SIGMA*LAMBDA1*RHO_Q
+    M2(1,3)=LAMBDA2*ETA_U-SIGMA*LAMBDA1*RHO_U
+    M2(1,4)=LAMBDA2*ETA_V-SIGMA*LAMBDA1*RHO_V
+    M2(2,1)=LAMBDA2*ETA_Q-SIGMA*LAMBDA1*RHO_Q
+    M2(2,3)=SIGMA*LAMBDA1*ETA_V+LAMBDA2*RHO_V
+    M2(2,4)=-SIGMA*LAMBDA1*ETA_U-LAMBDA2*RHO_U
+    M2(3,1)=LAMBDA2*ETA_U-SIGMA*LAMBDA1*RHO_U
+    M2(3,2)=-SIGMA*LAMBDA1*ETA_V-LAMBDA2*RHO_V
+    M2(3,4)=SIGMA*LAMBDA1*ETA_Q+LAMBDA2*RHO_Q
+    M2(4,1)=LAMBDA2*ETA_V-SIGMA*LAMBDA1*RHO_V
+    M2(4,2)=-SIGMA*LAMBDA1*ETA_U+LAMBDA2*RHO_U
+    M2(4,3)=-SIGMA*LAMBDA1*ETA_Q-LAMBDA1*RHO_Q
+    M2(:,:)=M2(:,:)/THETA
+    ! M3 matrix
+    M3(1,2)=LAMBDA1*ETA_Q+SIGMA*LAMBDA2*RHO_Q
+    M3(1,3)=LAMBDA1*ETA_U+SIGMA*LAMBDA2*RHO_U
+    M3(1,4)=LAMBDA1*ETA_V+SIGMA*LAMBDA2*RHO_V
+    M3(2,1)=LAMBDA1*ETA_Q+SIGMA*LAMBDA2*RHO_Q
+    M3(2,3)=-SIGMA*LAMBDA2*ETA_V+LAMBDA1*RHO_V
+    M3(2,4)=SIGMA*LAMBDA2*ETA_U-LAMBDA1*RHO_U
+    M3(3,1)=LAMBDA1*ETA_U+SIGMA*LAMBDA2*RHO_U
+    M3(3,2)=SIGMA*LAMBDA2*ETA_V-LAMBDA1*RHO_V
+    M3(3,4)=-SIGMA*LAMBDA2*ETA_Q+LAMBDA1*RHO_Q
+    M3(4,1)=LAMBDA1*ETA_V+SIGMA*LAMBDA2*RHO_V
+    M3(4,2)=-SIGMA*LAMBDA2*ETA_U+LAMBDA1*RHO_U
+    M3(4,3)=SIGMA*LAMBDA2*ETA_Q-LAMBDA1*RHO_Q
+    M3(:,:)=M3(:,:)/THETA
+    ! M4 matrix
+    M4(1,1)=(ETA2+RHO2)/2.
+    M4(1,2)=ETA_V*RHO_U-ETA_U*RHO_V
+    M4(1,3)=ETA_Q*RHO_V-ETA_V*RHO_Q
+    M4(1,4)=ETA_U*RHO_Q-ETA_Q*RHO_U
+    M4(2,1)=ETA_U*RHO_V-ETA_V*RHO_U
+    M4(2,2)=ETA_Q**2.+RHO_Q**2.-(ETA2+RHO2)/2.
+    M4(2,3)=ETA_Q*ETA_U+RHO_Q*RHO_U
+    M4(2,4)=ETA_V*ETA_Q+RHO_V*RHO_Q
+    M4(3,1)=ETA_V*RHO_Q-ETA_Q*RHO_V
+    M4(3,2)=ETA_Q*ETA_U+RHO_Q*RHO_U
+    M4(3,3)=ETA_U**2.+RHO_U**2.-(ETA2+RHO2)/2.
+    M4(3,4)=ETA_U*ETA_V+RHO_U*RHO_V
+    M4(4,1)=ETA_Q*RHO_U-ETA_U*RHO_Q
+    M4(4,2)=ETA_V*ETA_Q+RHO_V*RHO_Q
+    M4(4,3)=ETA_U*ETA_V+RHO_U*RHO_V
+    M4(4,4)=ETA_V**2.+RHO_V**2.-(ETA2+RHO2)/2.
+    M4(:,:)=2.*M4(:,:)/THETA
+    ! Multiplicative factors
+    COSHL1=0.5D0*(EXP(LAMBDA1*1E5*(ZZ(K+1)-ZZ(K)))+EXP(-LAMBDA1*1E5*(ZZ(K+1)-ZZ(K))))
+    SINHL1=0.5D0*(EXP(LAMBDA1*1E5*(ZZ(K+1)-ZZ(K)))-EXP(-LAMBDA1*1E5*(ZZ(K+1)-ZZ(K))))
+    COSL2=0.5D0*(EXP(LAMBDA2*II*1E5*(ZZ(K+1)-ZZ(K)))+EXP(-LAMBDA2*II*1E5*(ZZ(K+1)-ZZ(K))))
+    SINL2=0.5D0*(EXP(LAMBDA2*II*1E5*(ZZ(K+1)-ZZ(K)))-EXP(-LAMBDA2*II*1E5*(ZZ(K+1)-ZZ(K))))
+    EXPETAI=EXP(-ETA_I*1E5*(ZZ(K+1)-ZZ(K)))
+    ! Evolution operator
+    EVOL=EXPETAI*(0.5*(COSHL1+COSL2)*M1-SINL2*M2-SINHL1*M3+0.5*(COSHL1-COSL2)*M4)
+    PRINT*,EVOL
+    PAUSE
+
+    
+  END SUBROUTINE EVOL_OPERATOR
+
+
+END MODULE RTESOLVER
